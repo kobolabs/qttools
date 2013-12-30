@@ -47,6 +47,9 @@
 #include <QtCore/QFile>
 #include <QtCore/QDir>
 #include <QtCore/QDateTime>
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonObject>
+#include <QtCore/QJsonDocument>
 
 #include <cstdio>
 
@@ -69,6 +72,27 @@ enum Platform {
     UnknownPlatform
 };
 
+// Container class for JSON output
+class JsonOutput
+{
+public:
+    void addFile(const QString &source, const QString &target)
+    {
+        QJsonObject object;
+        object.insert(QStringLiteral("source"), QDir::toNativeSeparators(source));
+        object.insert(QStringLiteral("target"), QDir::toNativeSeparators(target));
+        m_files.append(object);
+    }
+    QByteArray toJson() const
+    {
+        QJsonObject document;
+        document.insert(QStringLiteral("files"), m_files);
+        return QJsonDocument(document).toJson();
+    }
+private:
+    QJsonArray m_files;
+};
+
 #ifdef Q_OS_WIN
 QString normalizeFileName(const QString &name);
 QString winErrorMessage(unsigned long error);
@@ -77,15 +101,20 @@ QString findSdkTool(const QString &tool);
 inline QString normalizeFileName(const QString &name) { return name; }
 #endif // !Q_OS_WIN
 
+static const char windowsSharedLibrarySuffix[] = ".dll";
+static const char unixSharedLibrarySuffix[] = ".so";
+
+inline QString sharedLibrarySuffix(Platform platform) { return QLatin1String((platform & WindowsBased) ? windowsSharedLibrarySuffix : unixSharedLibrarySuffix); }
+
 bool createSymbolicLink(const QFileInfo &source, const QString &target, QString *errorMessage);
 bool createDirectory(const QString &directory, QString *errorMessage);
 QString findInPath(const QString &file);
 QMap<QString, QString> queryQMakeAll(QString *errorMessage);
 QString queryQMake(const QString &variable, QString *errorMessage);
-QStringList findDependentLibs(const QString &binary, QString *errorMessage);
+QStringList findSharedLibraries(const QDir &directory, Platform platform, bool debug, const QString &prefix = QString());
 
 bool updateFile(const QString &sourceFileName, const QStringList &nameFilters,
-                const QString &targetDirectory, QString *errorMessage);
+                const QString &targetDirectory, JsonOutput *json, QString *errorMessage);
 bool runProcess(const QString &binary, const QStringList &args,
                 const QString &workingDirectory = QString(),
                 unsigned long *exitCode = 0, QByteArray *stdOut = 0, QByteArray *stdErr = 0,
@@ -107,12 +136,12 @@ inline bool readExecutable(const QString &executableFileName, Platform platform,
         readPeExecutable(executableFileName, errorMessage, dependentLibraries, wordSize, isDebug);
 }
 
-// Return dependent modules of a PE executable files.
+// Return dependent modules of executable files.
 
-inline QStringList findDependentLibraries(const QString &peExecutableFileName, Platform platform, QString *errorMessage)
+inline QStringList findDependentLibraries(const QString &executableFileName, Platform platform, QString *errorMessage)
 {
     QStringList result;
-    readExecutable(peExecutableFileName, platform, errorMessage, &result);
+    readExecutable(executableFileName, platform, errorMessage, &result);
     return result;
 }
 
@@ -131,6 +160,7 @@ bool updateFile(const QString &sourceFileName,
                 DirectoryFileEntryFunction directoryFileEntryFunction,
                 const QString &targetDirectory,
                 unsigned flags,
+                JsonOutput *json,
                 QString *errorMessage)
 {
     const QFileInfo sourceFileInfo(sourceFileName);
@@ -155,7 +185,7 @@ bool updateFile(const QString &sourceFileName,
         }
 
         // Update the linked-to file
-        if (!updateFile(sourcePath, directoryFileEntryFunction, targetDirectory, flags, errorMessage))
+        if (!updateFile(sourcePath, directoryFileEntryFunction, targetDirectory, flags, json, errorMessage))
             return false;
 
         if (targetFileInfo.exists()) {
@@ -199,7 +229,7 @@ bool updateFile(const QString &sourceFileName,
 
         const QStringList allEntries = directoryFileEntryFunction(dir) + dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
         foreach (const QString &entry, allEntries)
-            if (!updateFile(sourceFileName + QLatin1Char('/') + entry, directoryFileEntryFunction, targetFileName, flags, errorMessage))
+            if (!updateFile(sourceFileName + QLatin1Char('/') + entry, directoryFileEntryFunction, targetFileName, flags, json, errorMessage))
                 return false;
         return true;
     } // Source is directory.
@@ -209,6 +239,8 @@ bool updateFile(const QString &sourceFileName,
             && targetFileInfo.lastModified() >= sourceFileInfo.lastModified()) {
             if (optVerboseLevel)
                 std::printf("%s is up to date.\n", qPrintable(sourceFileInfo.fileName()));
+            if (json)
+                json->addFile(sourceFileName, targetDirectory);
             return true;
         }
         QFile targetFile(targetFileName);
@@ -228,6 +260,8 @@ bool updateFile(const QString &sourceFileName,
                      file.errorString());
         return false;
     }
+    if (json)
+        json->addFile(sourceFileName, targetDirectory);
     return true;
 }
 
@@ -242,9 +276,9 @@ private:
 };
 
 // Convenience for all files.
-inline bool updateFile(const QString &sourceFileName, const QString &targetDirectory, unsigned flags, QString *errorMessage)
+inline bool updateFile(const QString &sourceFileName, const QString &targetDirectory, unsigned flags, JsonOutput *json, QString *errorMessage)
 {
-    return updateFile(sourceFileName, NameFilterFileEntryFunction(QStringList()), targetDirectory, flags, errorMessage);
+    return updateFile(sourceFileName, NameFilterFileEntryFunction(QStringList()), targetDirectory, flags, json, errorMessage);
 }
 
 QT_END_NAMESPACE

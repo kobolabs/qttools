@@ -99,6 +99,8 @@ bool copyFilePrintStatus(const QString &from, const QString &to)
         LogNormal() << "File exists, skip copy:" << to;
         return false;
     } else if (QFile::copy(from, to)) {
+        QFile dest(to);
+        dest.setPermissions(dest.permissions() | QFile::WriteOwner | QFile::WriteUser);
         LogNormal() << " copied:" << from;
         LogNormal() << " to" << to;
         return true;
@@ -571,11 +573,17 @@ void deployPlugins(const ApplicationBundleInfo &appBundleInfo, const QString &pl
         }
     }
 
+    // multimedia plugins if QtMultimedia.framework is in use
     if (deploymentInfo.deployedFrameworks.contains(QStringLiteral("QtMultimedia.framework"))) {
-        QStringList sqlPlugins = QDir(pluginSourcePath + QStringLiteral("/mediaservice")).entryList(QStringList() << QStringLiteral("*.dylib"));
-        foreach (const QString &plugin, sqlPlugins) {
+        QStringList plugins = QDir(pluginSourcePath + QStringLiteral("/mediaservice")).entryList(QStringList() << QStringLiteral("*.dylib"));
+        foreach (const QString &plugin, plugins) {
             if (!plugin.endsWith(QStringLiteral("_debug.dylib")))
                 pluginList.append(QStringLiteral("mediaservice/") + plugin);
+        }
+        plugins = QDir(pluginSourcePath + QStringLiteral("/audio")).entryList(QStringList() << QStringLiteral("*.dylib"));
+        foreach (const QString &plugin, plugins) {
+            if (!plugin.endsWith(QStringLiteral("_debug.dylib")))
+                pluginList.append(QStringLiteral("audio/") + plugin);
         }
     }
 

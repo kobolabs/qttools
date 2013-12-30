@@ -438,14 +438,9 @@ static QStringList getSources(const ProFileEvaluator &visitor, const QString &pr
 
     // app/lib template
     sourceFiles += getSources("SOURCES", "VPATH_SOURCES", baseVPaths, projectDir, visitor);
+    sourceFiles += getSources("HEADERS", "VPATH_HEADERS", baseVPaths, projectDir, visitor);
 
     sourceFiles += getSources("FORMS", "VPATH_FORMS", baseVPaths, projectDir, visitor);
-    sourceFiles += getSources("FORMS3", "VPATH_FORMS3", baseVPaths, projectDir, visitor);
-
-    QStringList vPathsInc = baseVPaths;
-    vPathsInc += visitor.absolutePathValues(QLatin1String("INCLUDEPATH"), projectDir);
-    vPathsInc.removeDuplicates();
-    sourceFiles += visitor.absoluteFileValues(QLatin1String("HEADERS"), projectDir, vPathsInc, 0);
 
     QStringList installs = visitor.values(QLatin1String("INSTALLS"))
                          + visitor.values(QLatin1String("DEPLOYMENT"));
@@ -524,6 +519,25 @@ static void excludeProjects(const ProFileEvaluator &visitor, QStringList *subPro
     }
 }
 
+static bool processTs(Translator &fetchedTor, const QString &file, ConversionData &cd)
+{
+    foreach (const Translator::FileFormat &fmt, Translator::registeredFileFormats()) {
+        if (file.endsWith(QLatin1Char('.') + fmt.extension, Qt::CaseInsensitive)) {
+            Translator tor;
+            if (tor.load(file, cd, fmt.extension)) {
+                foreach (TranslatorMessage msg, tor.messages()) {
+                    msg.setType(TranslatorMessage::Unfinished);
+                    msg.setTranslations(QStringList());
+                    msg.setTranslatorComment(QString());
+                    fetchedTor.extend(msg, cd);
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 static void processSources(Translator &fetchedTor,
                            const QStringList &sourceFiles, ConversionData &cd)
 {
@@ -549,7 +563,7 @@ static void processSources(Translator &fetchedTor,
                  || it->endsWith(QLatin1String(".qs"), Qt::CaseInsensitive))
             requireQmlSupport = true;
 #endif // QT_NO_QML
-        else
+        else if (!processTs(fetchedTor, *it, cd))
             sourceFilesCpp << *it;
     }
 
@@ -618,7 +632,7 @@ static void processProject(
         ConversionData cd;
         cd.m_noUiLines = options & NoUiLines;
         cd.m_sourceIsUtf16 = options & SourceIsUtf16;
-        cd.m_includePath = visitor.values(QLatin1String("INCLUDEPATH"));
+        cd.m_includePath = visitor.absolutePathValues(QLatin1String("INCLUDEPATH"), proPath);
         cd.m_excludes = getExcludes(visitor, proPath);
         QStringList sourceFiles = getSources(visitor, proPath, cd.m_excludes);
         QSet<QString> sourceDirs;
@@ -752,6 +766,7 @@ int main(int argc, char **argv)
     int proDebug = 0;
     int numFiles = 0;
     bool metTsFlag = false;
+    bool metXTsFlag = false;
     bool recursiveScan = true;
 
     QString extensions = m_defaultExtensions;
@@ -852,6 +867,11 @@ int main(int argc, char **argv)
             return 0;
         } else if (arg == QLatin1String("-ts")) {
             metTsFlag = true;
+            metXTsFlag = false;
+            continue;
+        } else if (arg == QLatin1String("-xts")) {
+            metTsFlag = false;
+            metXTsFlag = true;
             continue;
         } else if (arg == QLatin1String("-extensions")) {
             ++i;
@@ -953,6 +973,8 @@ int main(int argc, char **argv)
                 }
             }
             numFiles++;
+        } else if (metXTsFlag) {
+            alienFiles += files;
         } else {
             foreach (const QString &file, files) {
                 QFileInfo fi(file);
@@ -1004,17 +1026,10 @@ int main(int argc, char **argv)
                         }
                     }
                 } else {
-                    foreach (const Translator::FileFormat &fmt, Translator::registeredFileFormats()) {
-                        if (file.endsWith(QLatin1Char('.') + fmt.extension, Qt::CaseInsensitive)) {
-                            alienFiles << file;
-                            goto gotfile;
-                        }
-                    }
                     sourceFiles << QDir::cleanPath(fi.absoluteFilePath());;
                     projectRoots.insert(fi.absolutePath() + QLatin1Char('/'));
                 }
             }
-          gotfile:
             numFiles++;
         }
     } // for args

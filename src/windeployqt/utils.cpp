@@ -111,6 +111,35 @@ bool createDirectory(const QString &directory, QString *errorMessage)
     return true;
 }
 
+// Find shared libraries matching debug/Platform in a directory, return relative names.
+QStringList findSharedLibraries(const QDir &directory, Platform platform, bool debug, const QString &prefix)
+{
+    QString nameFilter = prefix;
+    if (nameFilter.isEmpty())
+        nameFilter += QLatin1Char('*');
+    if (debug && (platform & WindowsBased))
+        nameFilter += QLatin1Char('d');
+    nameFilter += sharedLibrarySuffix(platform);
+    QStringList result;
+    QString errorMessage;
+    foreach (const QString &dll, directory.entryList(QStringList(nameFilter), QDir::Files)) {
+        const QString dllPath = directory.absoluteFilePath(dll);
+        bool matches = true;
+        if (platform & WindowsBased) {
+            bool debugDll;
+            if (readPeExecutable(dllPath, &errorMessage, 0, 0, &debugDll)) {
+                matches = debugDll == debug;
+            } else {
+                std::fprintf(stderr, "Warning: Unable to read %s: %s",
+                             qPrintable(QDir::toNativeSeparators(dllPath)), qPrintable(errorMessage));
+            }
+        } // Windows
+        if (matches)
+            result += dll;
+    } // for
+    return result;
+}
+
 #ifdef Q_OS_WIN
 QString winErrorMessage(unsigned long error)
 {
@@ -476,7 +505,7 @@ QString queryQMake(const QString &variable, QString *errorMessage)
 
 // Update a file or directory.
 bool updateFile(const QString &sourceFileName, const QStringList &nameFilters,
-                const QString &targetDirectory, QString *errorMessage)
+                const QString &targetDirectory, JsonOutput *json, QString *errorMessage)
 {
     const QFileInfo sourceFileInfo(sourceFileName);
     const QString targetFileName = targetDirectory + QLatin1Char('/') + sourceFileInfo.fileName();
@@ -517,7 +546,7 @@ bool updateFile(const QString &sourceFileName, const QStringList &nameFilters,
         QDir dir(sourceFileName);
         const QStringList allEntries = dir.entryList(nameFilters, QDir::Files) + dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
         foreach (const QString &entry, allEntries)
-            if (!updateFile(sourceFileName + QLatin1Char('/') + entry, nameFilters, targetFileName, errorMessage))
+            if (!updateFile(sourceFileName + QLatin1Char('/') + entry, nameFilters, targetFileName, json, errorMessage))
                 return false;
         return true;
     } // Source is directory.
@@ -526,6 +555,8 @@ bool updateFile(const QString &sourceFileName, const QStringList &nameFilters,
         if (targetFileInfo.lastModified() >= sourceFileInfo.lastModified()) {
             if (optVerboseLevel)
                 std::printf("%s is up to date.\n", qPrintable(sourceFileInfo.fileName()));
+            if (json)
+                json->addFile(sourceFileName, targetDirectory);
             return true;
         }
         QFile targetFile(targetFileName);
@@ -545,6 +576,8 @@ bool updateFile(const QString &sourceFileName, const QStringList &nameFilters,
                      file.errorString());
         return false;
     }
+    if (json)
+        json->addFile(sourceFileName, targetDirectory);
     return true;
 }
 
@@ -758,7 +791,7 @@ bool readPeExecutable(const QString &peExecutableFileName, QString *errorMessage
 QString findD3dCompiler(Platform platform, unsigned wordSize)
 {
     const QString prefix = QStringLiteral("D3Dcompiler_");
-    const QString suffix = QStringLiteral(".dll");
+    const QString suffix = QLatin1String(windowsSharedLibrarySuffix);
     // Get the DLL from Kit 8.0 onwards
     const QString kitDir = QString::fromLocal8Bit(qgetenv("WindowsSdkDir"));
     if (!kitDir.isEmpty()) {
