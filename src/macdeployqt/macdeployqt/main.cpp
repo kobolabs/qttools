@@ -135,10 +135,7 @@ int main(int argc, char **argv)
     DeploymentInfo deploymentInfo  = deployQtFrameworks(appBundlePath, additionalExecutables, useDebugLibs);
 
     if (plugins) {
-        if (deploymentInfo.qtPath.isEmpty())
-            deploymentInfo.pluginPath = "/Developer/Applications/Qt/plugins"; // Assume binary package.
-        else
-            deploymentInfo.pluginPath = deploymentInfo.qtPath + "/plugins";
+        deploymentInfo.pluginPath = "/usr/local/Qt-5.2.0/plugins";
 
         LogNormal();
         deployPlugins(appBundlePath, deploymentInfo, useDebugLibs);
