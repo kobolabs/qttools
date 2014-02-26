@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+** Copyright (C) 2013 Tasuku Suzuki <stasuku@gmail.com>
 ** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the tools applications of the Qt Toolkit.
@@ -38,39 +38,20 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
-#include "../shared/shared.h"
 
-int main(int argc, char **argv)
+#ifndef LOGVIEWER_H
+#define LOGVIEWER_H
+
+#include <QtWidgets/QTextBrowser>
+
+class LogViewer : public QTextBrowser
 {
-    // useDebugLibs should always be false because even if set all Qt
-    // libraries inside a binary to point to debug versions, as soon as
-    // one of them loads a Qt plugin, the plugin itself will load the
-    // release version of Qt, and as such, the app will crash.
-    bool useDebugLibs = false;
+    Q_OBJECT
+public:
+    explicit LogViewer(QWidget *parent = 0);
 
-    int optionsSpecified = 0;
-    for (int i = 2; i < argc; ++i) {
-        QByteArray argument = QByteArray(argv[i]);
-        if (argument.startsWith(QByteArray("-verbose="))) {
-            LogDebug() << "Argument found:" << argument;
-            optionsSpecified++;
-            int index = argument.indexOf("=");
-            bool ok = false;
-            int number = argument.mid(index+1).toInt(&ok);
-            if (!ok)
-                LogError() << "Could not parse verbose level";
-            else
-                logLevel = number;
-        }
-    }
+protected:
+    virtual void contextMenuEvent(QContextMenuEvent *event);
+};
 
-    if (argc != (3 + optionsSpecified)) {
-        qDebug() << "Changeqt: changes which Qt frameworks an application links against.";
-        qDebug() << "Usage: changeqt app-bundle qt-dir <-verbose=[0-3]>";
-        return 0;
-    }
-
-    const QString appPath = QString::fromLocal8Bit(argv[1]);
-    const QString qtPath = QString::fromLocal8Bit(argv[2]);
-    changeQtFrameworks(appPath, qtPath, useDebugLibs);
-}
+#endif // LOGVIEWER_H

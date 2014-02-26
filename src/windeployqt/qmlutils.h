@@ -38,39 +38,37 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
-#include "../shared/shared.h"
 
-int main(int argc, char **argv)
-{
-    // useDebugLibs should always be false because even if set all Qt
-    // libraries inside a binary to point to debug versions, as soon as
-    // one of them loads a Qt plugin, the plugin itself will load the
-    // release version of Qt, and as such, the app will crash.
-    bool useDebugLibs = false;
+#ifndef QMLUTILS_H
+#define QMLUTILS_H
 
-    int optionsSpecified = 0;
-    for (int i = 2; i < argc; ++i) {
-        QByteArray argument = QByteArray(argv[i]);
-        if (argument.startsWith(QByteArray("-verbose="))) {
-            LogDebug() << "Argument found:" << argument;
-            optionsSpecified++;
-            int index = argument.indexOf("=");
-            bool ok = false;
-            int number = argument.mid(index+1).toInt(&ok);
-            if (!ok)
-                LogError() << "Could not parse verbose level";
-            else
-                logLevel = number;
-        }
-    }
+#include <QStringList>
 
-    if (argc != (3 + optionsSpecified)) {
-        qDebug() << "Changeqt: changes which Qt frameworks an application links against.";
-        qDebug() << "Usage: changeqt app-bundle qt-dir <-verbose=[0-3]>";
-        return 0;
-    }
+QT_BEGIN_NAMESPACE
 
-    const QString appPath = QString::fromLocal8Bit(argv[1]);
-    const QString qtPath = QString::fromLocal8Bit(argv[2]);
-    changeQtFrameworks(appPath, qtPath, useDebugLibs);
-}
+QString findQmlDirectory(int platform, const QString &startDirectoryName);
+
+struct QmlImportScanResult {
+    struct Module {
+        QString relativeInstallPath() const;
+        QString installPath(const QString &root) const;
+
+        QString name;
+        QString className;
+        QString sourcePath;
+    };
+
+    QmlImportScanResult() : ok(false) {}
+    void append(const QmlImportScanResult &other);
+
+    bool ok;
+    QList<Module> modules;
+    QStringList plugins;
+};
+
+QmlImportScanResult runQmlImportScanner(const QString &directory, const QString &qmlImportPath,
+                                        int platform, bool debug, QString *errorMessage);
+
+QT_END_NAMESPACE
+
+#endif // QMLUTILS_H

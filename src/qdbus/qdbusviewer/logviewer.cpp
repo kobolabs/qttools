@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+** Copyright (C) 2013 Tasuku Suzuki <stasuku@gmail.com>
 ** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the tools applications of the Qt Toolkit.
@@ -38,39 +38,22 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
-#include "../shared/shared.h"
 
-int main(int argc, char **argv)
+#include "logviewer.h"
+
+#include <QtGui/QContextMenuEvent>
+#include <QtWidgets/QMenu>
+
+LogViewer::LogViewer(QWidget *parent)
+    : QTextBrowser(parent)
 {
-    // useDebugLibs should always be false because even if set all Qt
-    // libraries inside a binary to point to debug versions, as soon as
-    // one of them loads a Qt plugin, the plugin itself will load the
-    // release version of Qt, and as such, the app will crash.
-    bool useDebugLibs = false;
+}
 
-    int optionsSpecified = 0;
-    for (int i = 2; i < argc; ++i) {
-        QByteArray argument = QByteArray(argv[i]);
-        if (argument.startsWith(QByteArray("-verbose="))) {
-            LogDebug() << "Argument found:" << argument;
-            optionsSpecified++;
-            int index = argument.indexOf("=");
-            bool ok = false;
-            int number = argument.mid(index+1).toInt(&ok);
-            if (!ok)
-                LogError() << "Could not parse verbose level";
-            else
-                logLevel = number;
-        }
-    }
-
-    if (argc != (3 + optionsSpecified)) {
-        qDebug() << "Changeqt: changes which Qt frameworks an application links against.";
-        qDebug() << "Usage: changeqt app-bundle qt-dir <-verbose=[0-3]>";
-        return 0;
-    }
-
-    const QString appPath = QString::fromLocal8Bit(argv[1]);
-    const QString qtPath = QString::fromLocal8Bit(argv[2]);
-    changeQtFrameworks(appPath, qtPath, useDebugLibs);
+void LogViewer::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu *menu = createStandardContextMenu();
+    QAction *action = menu->addAction(tr("Clear"));
+    connect(action, SIGNAL(triggered()), this, SLOT(clear()));
+    menu->exec(event->globalPos());
+    delete menu;
 }
