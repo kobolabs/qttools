@@ -40,6 +40,7 @@
 ****************************************************************************/
 #include "../shared/shared.h"
 #include <qdir.h>
+#include <qlibraryinfo.h>
 
 int main(int argc, char **argv)
 {
@@ -135,7 +136,7 @@ int main(int argc, char **argv)
     DeploymentInfo deploymentInfo  = deployQtFrameworks(appBundlePath, additionalExecutables, useDebugLibs);
 
     if (plugins) {
-        deploymentInfo.pluginPath = "/usr/local/Qt-5.2.0/plugins";
+        deploymentInfo.pluginPath = QLibraryInfo::location(QLibraryInfo::PluginsPath);
 
         LogNormal();
         deployPlugins(appBundlePath, deploymentInfo, useDebugLibs);
