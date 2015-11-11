@@ -657,11 +657,16 @@ bool saveQM(const Translator &translator, QIODevice &dev, ConversionData &cd)
     int untranslated = 0;
     int missingIds = 0;
     int droppedData = 0;
+    int futureData = 0;
 
     for (int i = 0; i != translator.messageCount(); ++i) {
         const TranslatorMessage &msg = translator.message(i);
         TranslatorMessage::Type typ = msg.type();
         if (typ != TranslatorMessage::Obsolete && typ != TranslatorMessage::Vanished) {
+            if (!cd.m_future && msg.hasExtra(QLatin1String("future"))) {
+                ++futureData;
+                continue;
+            }
             if (cd.m_idBased && msg.id().isEmpty()) {
                 ++missingIds;
                 continue;
@@ -718,8 +723,8 @@ bool saveQM(const Translator &translator, QIODevice &dev, ConversionData &cd)
     if (saved && cd.isVerbose()) {
         int generatedCount = finished + unfinished;
         cd.appendError(QCoreApplication::translate("LRelease",
-            "    Generated %n translation(s) (%1 finished and %2 unfinished)", 0,
-            generatedCount).arg(finished).arg(unfinished));
+            "    Generated %n translation(s) (%1 finished and %2 unfinished and %3 future)", 0,
+            generatedCount).arg(finished).arg(unfinished).arg(futureData));
         if (untranslated)
             cd.appendError(QCoreApplication::translate("LRelease",
                 "    Ignored %n untranslated source text(s)", 0,
