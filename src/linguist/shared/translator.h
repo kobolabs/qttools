@@ -67,6 +67,7 @@ class ConversionData
 public:
     ConversionData() :
         m_verbose(false),
+        m_future(false),
         m_ignoreUnfinished(false),
         m_sortContexts(false),
         m_noUiLines(false),
@@ -102,6 +103,7 @@ public:
     QStringList m_dropTags;  // tags to be dropped
     QStringList m_errors;
     bool m_verbose;
+    bool m_future;
     bool m_ignoreUnfinished;
     bool m_sortContexts;
     bool m_noUiLines;

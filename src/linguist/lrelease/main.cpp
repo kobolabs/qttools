@@ -119,6 +119,8 @@ static void printUsage()
         "           prefixed with the given string instead\n"
         "    -silent\n"
         "           Do not explain what is being done\n"
+        "    -future\n"
+        "           Include what is being done in the future\n"
         "    -version\n"
         "           Display the version of lrelease and exit\n"
     ));
@@ -282,6 +284,9 @@ int main(int argc, char **argv)
             continue;
         } else if (!strcmp(argv[i], "-verbose")) {
             cd.m_verbose = true;
+            continue;
+        } else if (!strcmp(argv[i], "-future")) {
+            cd.m_future = true;
             continue;
         } else if (!strcmp(argv[i], "-version")) {
             printOut(LR::tr("lrelease version %1\n").arg(QLatin1String(QT_VERSION_STR)));
