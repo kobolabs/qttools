@@ -46,6 +46,7 @@
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDebug>
 #include <QtCore/QFile>
+#include <QtCore/QStack>
 #include <QtCore/QString>
 
 #include <QtXml/QXmlAttributes>
@@ -65,7 +66,7 @@ class UiReader : public QXmlDefaultHandler
 public:
     UiReader(Translator &translator, ConversionData &cd)
       : m_translator(translator), m_cd(cd), m_lineNumber(-1), m_isTrString(false),
-        m_insideStringList(false)
+        m_insideStringList(false), m_insideFutureProperty(false), m_futureDepth(0)
     {}
 
     bool startElement(const QString &namespaceURI, const QString &localName,
@@ -93,6 +94,9 @@ private:
     int m_lineNumber;
     bool m_isTrString;
     bool m_insideStringList;
+    bool m_insideFutureProperty;
+    QStack<QString> m_parents;
+    int m_futureDepth;
 };
 
 bool UiReader::startElement(const QString &namespaceURI,
@@ -109,7 +113,14 @@ bool UiReader::startElement(const QString &namespaceURI,
         flush();
         m_insideStringList = true;
         readTranslationAttributes(atts);
+    } else if (qName == QLatin1String("property") && atts.value(QStringLiteral("name")) == QStringLiteral("future") && m_parents.top() == QStringLiteral("widget")) {
+        m_insideFutureProperty = true;
     }
+
+    if (m_futureDepth > 0) {
+        m_futureDepth++;
+    }
+    m_parents.push(qName);
     m_accum.clear();
     return true;
 }
@@ -121,6 +132,13 @@ bool UiReader::endElement(const QString &namespaceURI,
     Q_UNUSED(localName);
 
     m_accum.replace(QLatin1String("\r\n"), QLatin1String("\n"));
+    m_parents.pop();
+
+    if (m_futureDepth > 0) {
+        m_futureDepth--;
+    } else if (m_insideFutureProperty && qName == QStringLiteral("bool") && QVariant(m_accum).toBool()) {
+        m_futureDepth = 2; // apply at the parent <widget>'s level
+    }
 
     if (qName == QLatin1String("class")) { // UI "header"
         if (m_context.isEmpty())
@@ -132,6 +150,8 @@ bool UiReader::endElement(const QString &namespaceURI,
         flush();
     } else if (qName == QLatin1String("stringlist")) {
         m_insideStringList = false;
+    } else if (qName == QLatin1String("property")) {
+        m_insideFutureProperty = false;
     } else {
         flush();
     }
@@ -160,6 +180,11 @@ void UiReader::flush()
            m_comment, QString(), m_cd.m_sourceFileName,
            m_lineNumber, QStringList());
         msg.setExtraComment(m_extracomment);
+        if (m_futureDepth > 0) {
+            TranslatorMessage::ExtraData extraData;
+            extraData.insert(QLatin1String("future"), QLatin1String("true"));
+            msg.setExtras(extraData);
+        }
         m_translator.extend(msg, m_cd);
     }
     m_source.clear();
