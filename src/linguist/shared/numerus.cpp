@@ -153,7 +153,6 @@ static const QLocale::Language japaneseStyleLanguages[] = {
     QLocale::Sundanese,
     QLocale::Thai,
     QLocale::Tibetan,
-    QLocale::Turkish,
     QLocale::Vietnamese,
     QLocale::Yoruba,
     QLocale::Zhuang,
@@ -241,6 +240,7 @@ static const QLocale::Language englishStyleLanguages[] = {
     QLocale::Tongan,
     QLocale::Tsonga,
     QLocale::Tswana,
+    QLocale::Turkish,
     QLocale::Turkmen,
     // QLocale::Twi, // mapped to Akan
     QLocale::Uigur,
