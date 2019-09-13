@@ -216,6 +216,7 @@ private:
     void addIndex(int idx, const TranslatorMessage &msg) const;
     void delIndex(int idx) const;
     void ensureIndexed() const;
+    void mergeFutureFlags(ExtraData &msgExtras, ExtraData &emsgExtras);
 
     typedef QList<TranslatorMessage> TMM;       // int stores the sequence position.
 
