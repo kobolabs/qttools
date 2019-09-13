@@ -151,6 +151,15 @@ static QString makeMsgId(const TranslatorMessage &msg)
     return id;
 }
 
+void Translator::mergeFutureFlags(ExtraData &msgExtras, ExtraData &emsgExtras)
+{
+    const QString futureKey(QLatin1String("future"));
+    if (msgExtras.value(futureKey) != emsgExtras.value(futureKey)) {
+        msgExtras.remove(futureKey);
+        emsgExtras.remove(futureKey);
+    }
+}
+
 void Translator::extend(const TranslatorMessage &msg, ConversionData &cd)
 {
     int index = find(msg);
@@ -165,9 +174,12 @@ void Translator::extend(const TranslatorMessage &msg, ConversionData &cd)
                            .arg(emsg.id()));
             return;
         }
-        if (emsg.extras().isEmpty()) {
-            emsg.setExtras(msg.extras());
-        } else if (!msg.extras().isEmpty() && emsg.extras() != msg.extras()) {
+        ExtraData msgExtras = msg.extras();
+        ExtraData emsgExtras = emsg.extras();
+        mergeFutureFlags(msgExtras, emsgExtras);
+        if (emsgExtras.isEmpty()) {
+            emsg.setExtras(msgExtras);
+        } else if (!msgExtras.isEmpty() && emsgExtras != msgExtras) {
             cd.appendError(QString::fromLatin1("Contradicting meta data for for %1.")
                            .arg(!emsg.id().isEmpty()
                                 ? QString::fromLatin1("message with id '%1'").arg(emsg.id())
